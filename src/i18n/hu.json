@@ -5,5 +5,11 @@
   "projects": "Projektek",
   "settings": "Beállítások",
   "onboarding_welcome": "Üdvözlünk a TRIX AI Assistantban",
-  "onboarding_sub": "Segítünk a munkáid megszervezésében és gyorsabbá tételében"
+  "onboarding_sub": "Segítünk a munkáid megszervezésében és gyorsabbá tételében",
+  "onboarding_intro_title": "Kezdjünk neki",
+  "onboarding_intro_sub": "A TRIX AI segít rendszerezni és automatizálni a vállalkozásod feladatait.",
+  "onboarding_permissions_title": "Engedélyek",
+  "onboarding_permissions_sub": "Engedélyek kérése a jobb élményért: kamera, mikrofon, fájlok.",
+  "onboarding_finish_title": "Készen vagyunk",
+  "onboarding_finish_sub": "Most már használhatod az alkalmazást."
 }
