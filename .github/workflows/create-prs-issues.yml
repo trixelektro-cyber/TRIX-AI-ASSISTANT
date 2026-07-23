@@ -1,0 +1,98 @@
+name: Create PRs and Issues
+on:
+  workflow_dispatch: {}
+  push:
+    branches:
+      - feature/onboarding
+
+permissions:
+  contents: write
+  issues: write
+  pull-requests: write
+
+jobs:
+  create:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Create PRs and Issues via GitHub API
+        env:
+          GITHUB_REPO: ${{ github.repository }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          OWNER: ${{ github.repository_owner }}
+        run: |
+          set -euo pipefail
+          API="https://api.github.com"
+          REPO="$GITHUB_REPO"
+          OWNER="$OWNER"
+          TOKEN="$GITHUB_TOKEN"
+
+          echo "Repository: $REPO"
+
+          # Helper to check and create a pull request if not exists
+          create_pr_if_missing() {
+            local head="$1"
+            local base="$2"
+            local title="$3"
+            local body="$4"
+
+            echo "Checking PR $head -> $base"
+            existing_pr=$(curl -s -H "Authorization: Bearer $TOKEN" "$API/repos/$REPO/pulls?head=$OWNER:$head&base=$base")
+            if echo "$existing_pr" | jq -e '.[0]' > /dev/null 2>&1; then
+              echo "PR already exists for $head -> $base"
+              echo "$existing_pr" | jq -r '.[0].html_url'
+            else
+              echo "Creating PR: $title"
+              resp=$(curl -s -X POST -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" -d "{\"title\": \"$title\", \"head\": \"$head\", \"base\": \"$base\", \"body\": \"$body\"}" "$API/repos/$REPO/pulls")
+              echo "$resp" | jq -r '.html_url'
+            fi
+          }
+
+          # Helper to check and create an issue by title if not exists
+          create_issue_if_missing() {
+            local title="$1"
+            local body="$2"
+            local labels="$3"
+
+            echo "Searching for existing issue with title: $title"
+            search=$(curl -s -H "Authorization: Bearer $TOKEN" "$API/search/issues?q=$(echo "$title" | jq -s -R -r @uri)+repo:$REPO+in:title")
+            if [ $(echo "$search" | jq '.total_count') -gt 0 ]; then
+              echo "Issue already exists:"
+              echo "$search" | jq -r '.items[0].html_url'
+            else
+              echo "Creating issue: $title"
+              payload=$(jq -n --arg t "$title" --arg b "$body" --arg l "$labels" '{title: $t, body: $b, labels: ($l | split(",") ) }')
+              resp=$(curl -s -X POST -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" -d "$payload" "$API/repos/$REPO/issues")
+              echo "$resp" | jq -r '.html_url'
+            fi
+          }
+
+          # Create PRs
+          pr1_url=$(create_pr_if_missing "feature/onboarding" "feature/scaffold" "feat(onboarding): onboarding flow and UI components" "Adds onboarding flow (Intro, Permissions, Finish) and shared UI components (Button, Card, Icon, EmptyState). QA checklist: build locally, onboarding completes, unit tests pass. No secrets included.")
+          echo "PR1: $pr1_url"
+
+          pr2_url=$(create_pr_if_missing "feature/scaffold" "main" "chore(scaffold): initial scaffold (Expo + TypeScript)" "Initial Expo + TypeScript scaffold for TRIX AI Assistant. Includes navigation, basic screens (Dashboard, Chat, Knowledge, Projects, Settings), AIProvider interface and mock adapter, i18n HU, and basic CI. Do not merge without review.")
+          echo "PR2: $pr2_url"
+
+          # Create prioritized issues
+          issue1_url=$(create_issue_if_missing "Onboarding flow — finomhangolás és UX copy" "Finomhangoljuk az onboarding flow-t: pontos magyar szövegek, illusztrációk, onboarding completion flag mentése és üres állapot UX. See .github/ISSUE_TEMPLATE/onboarding_flow.md" "onboarding,priority:high")
+          echo "Issue1: $issue1_url"
+
+          issue2_url=$(create_issue_if_missing "Chat UX fejlesztés (typing indicator, autoscroll, conversation list)" "Fejlesszük tovább a chat élményt: typing indicator, üzenetek automatikus görgetése, beszélgetések listája és üzenetek perzisztálása. See .github/ISSUE_TEMPLATE/chat_ux.md" "chat,priority:high")
+          echo "Issue2: $issue2_url"
+
+          issue3_url=$(create_issue_if_missing "Design system — theme & design tokens" "Hozzuk létre a design system alapjait: design tokenok, közös komponensek és Storybook-szerű bemutató. See .github/ISSUE_TEMPLATE/design_system.md" "design,priority:high")
+          echo "Issue3: $issue3_url"
+
+          issue4_url=$(create_issue_if_missing "Tudásbázis UI (kategóriák, kereső, dokumentum preview)" "Implementáljuk a tudásbázis UI-t: kategória lista, kereső és dokumentum preview. See .github/ISSUE_TEMPLATE/knowledge_ui.md" "knowledgebase,priority:medium")
+          echo "Issue4: $issue4_url"
+
+          issue5_url=$(create_issue_if_missing "Tesztek és CI szigorítása" "Kiterjesztjük a teszteket és a CI pipeline-t úgy, hogy lint vagy typecheck hibák meghiúsítsák a buildet. See .github/ISSUE_TEMPLATE/tests_ci.md" "ci,tests,priority:medium")
+          echo "Issue5: $issue5_url"
+
+          issue6_url=$(create_issue_if_missing "EAS & Testifly pipeline előkészítés" "Előkészítjük a workflow-kat EAS buildhez és Testifly futtatáshoz (titkok nélkül). See .github/ISSUE_TEMPLATE/eas_testifly.md" "ci,release,priority:low")
+          echo "Issue6: $issue6_url"
+
+          echo "Done. PRs and Issues created or already exist."
